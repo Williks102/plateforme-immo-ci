@@ -1,0 +1,77 @@
+services:
+  - type: web
+    name: immo-ci-app
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: immo-ci-db
+          property: connectionString
+      # Upstash Redis REST API (externe — créer sur upstash.com)
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: PAIEMENTPRO_MERCHANT_ID
+        sync: false
+      - key: PAYMENT_PRO_CALLBACK_ORIGIN
+        value: https://paiementpro.net
+      - key: ADMIN_PHONE
+        sync: false
+      - key: DO_SPACES_KEY
+        sync: false
+      - key: DO_SPACES_SECRET
+        sync: false
+      - key: DO_SPACES_ENDPOINT
+        sync: false
+      - key: DO_SPACES_BUCKET
+        sync: false
+      - key: WHATSAPP_API_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: SMS_PROVIDER
+        value: africas_talking
+      - key: SMS_PROVIDER_API_KEY
+        sync: false
+      - key: SMS_PROVIDER_USERNAME
+        sync: false
+
+  - type: worker
+    name: immo-ci-worker
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: npm install && npx tsc -p tsconfig.worker.json
+    startCommand: node dist/workers/disburse.js
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: immo-ci-db
+          property: connectionString
+      - key: PAIEMENTPRO_MERCHANT_ID
+        sync: false
+      - key: WHATSAPP_API_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: ADMIN_PHONE
+        sync: false
+
+databases:
+  - name: immo-ci-db
+    databaseName: immo_ci
+    region: frankfurt
+    plan: starter
+    postgresMajorVersion: 16
