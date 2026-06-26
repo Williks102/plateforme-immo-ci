@@ -9,14 +9,45 @@ const allowedOrigins = [
 const ADMIN_PATHS   = ['/admin', '/api/admin'];
 const PRIVATE_PATHS = ['/dashboard', '/biens/nouveau', '/reservations'];
 
+const PAYMENT_ORIGINS = [
+  'https://*.paiementpro.net',
+  'https://paiementpro.net',
+  'https://mpayment.orange-money.com',
+  'https://pay.wave.com',
+  'https://www.wave.com',
+].join(' ');
+
+function buildCsp(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://api.mapbox.com https://www.paiementpro.net`,
+    `style-src 'self' 'unsafe-inline' https://api.mapbox.com`,
+    `img-src 'self' blob: data: https://*.digitaloceanspaces.com https://api.mapbox.com`,
+    `connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://www.paiementpro.net ${PAYMENT_ORIGINS}`,
+    `frame-src 'self' https://www.paiementpro.net`,
+    "object-src 'none'",
+    "base-uri 'self'",
+    `form-action 'self' https://www.paiementpro.net`,
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests",
+  ].join('; ');
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Nonce CSP — généré par requête, jamais statique
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const csp   = buildCsp(nonce);
+
+  // Passer le nonce à Next.js (il l'injecte dans ses scripts inline)
+  const reqHeaders = new Headers(req.headers);
+  reqHeaders.set('x-nonce', nonce);
 
   // CORS — bloquer les origines non whitelistées sur les routes API
   if (pathname.startsWith('/api/')) {
     const origin = req.headers.get('origin');
     if (origin && !allowedOrigins.includes(origin)) {
-      // Autoriser le callback PaiementPro
       const paiementProOrigin = process.env.PAYMENT_PRO_CALLBACK_ORIGIN ?? 'https://paiementpro.net';
       if (!(pathname.startsWith('/api/webhooks/') && origin === paiementProOrigin)) {
         return new NextResponse('Forbidden', { status: 403 });
@@ -43,18 +74,12 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  const res = NextResponse.next({ request: { headers: reqHeaders } });
+  res.headers.set('Content-Security-Policy', csp);
+  return res;
 }
 
 export const config = {
-  matcher: [
-    '/admin/:path*',
-    '/dashboard/:path*',
-    '/biens/:path*',
-    '/reservations/:path*',
-    '/api/admin/:path*',
-    '/api/bookings/:path*',
-    '/api/listings/:path*',
-    '/api/upload',
-  ],
+  // Couvre toutes les pages — exclut les assets statiques Next.js
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
