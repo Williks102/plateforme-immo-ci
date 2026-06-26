@@ -80,7 +80,7 @@ export function OTPForm({ redirectTo = '/' }: Props) {
           </div>
           <button
             onClick={sendOTP}
-            disabled={loading || phone.length < 8}
+            disabled={loading || phone.replace(/\D/g, '').length < 8}
             className="w-full bg-orange-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50"
           >
             {loading ? 'Envoi...' : 'Recevoir le code SMS'}
