@@ -1,7 +1,31 @@
 import type { NextConfig } from 'next';
 
-// CSP gérée dynamiquement dans src/proxy.ts (nonce par requête)
+const PAYMENT_ORIGINS = [
+  'https://paiementpro.net',
+  'https://*.paiementpro.net',
+  'https://mpayment.orange-money.com',
+  'https://pay.wave.com',
+  'https://www.wave.com',
+].join(' ');
+
 const securityHeaders = [
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      // 'unsafe-inline' requis : Next.js injecte des scripts inline pour l'hydration
+      `script-src 'self' 'unsafe-inline' https://api.mapbox.com https://www.paiementpro.net`,
+      `style-src 'self' 'unsafe-inline' https://api.mapbox.com`,
+      `img-src 'self' blob: data: https://*.digitaloceanspaces.com https://api.mapbox.com`,
+      `connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://www.paiementpro.net ${PAYMENT_ORIGINS}`,
+      `frame-src 'self' https://www.paiementpro.net`,
+      "object-src 'none'",
+      "base-uri 'self'",
+      `form-action 'self' https://www.paiementpro.net`,
+      "frame-ancestors 'none'",
+      "upgrade-insecure-requests",
+    ].join('; '),
+  },
   { key: 'X-Content-Type-Options',  value: 'nosniff' },
   { key: 'X-Frame-Options',         value: 'DENY' },
   { key: 'X-XSS-Protection',        value: '1; mode=block' },
