@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   try {
     const { email, password, role } = schema.parse(await req.json());
 
-    const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existing = await db.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
     if ((existing.rowCount ?? 0) > 0) {
       return NextResponse.json({ error: 'Un compte existe déjà avec cet email' }, { status: 409 });
     }

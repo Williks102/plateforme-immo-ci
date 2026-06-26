@@ -1,26 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
 import { db } from '@/lib/db';
 import { createSession, sessionCookieOptions } from '@/lib/auth';
-
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, '10 m'),
-});
 
 const schema = z.object({
   email: z.string().email('Email invalide'),
   password: z.string().min(1, 'Mot de passe requis'),
 });
 
+// Rate-limiter optionnel — uniquement si Upstash est configuré
+async function checkRateLimit(ip: string): Promise<boolean> {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return true; // pas de limiter → autorisé
+  }
+  try {
+    const { Ratelimit } = await import('@upstash/ratelimit');
+    const { Redis } = await import('@upstash/redis');
+    const ratelimit = new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(10, '10 m'),
+    });
+    const { success } = await ratelimit.limit(`login:${ip}`);
+    return success;
+  } catch (e) {
+    console.warn('[login] rate-limit indisponible:', e);
+    return true; // en cas d'erreur Redis, on laisse passer
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for') ?? 'anonymous';
-    const { success } = await ratelimit.limit(`login:${ip}`);
-    if (!success) {
+    const allowed = await checkRateLimit(ip);
+    if (!allowed) {
       return NextResponse.json({ error: 'Trop de tentatives. Réessayez dans 10 minutes.' }, { status: 429 });
     }
 
@@ -31,7 +44,6 @@ export async function POST(req: NextRequest) {
       [email.toLowerCase()]
     );
 
-    // Message générique — ne pas révéler si l'email existe
     const INVALID_MSG = 'Email ou mot de passe incorrect';
 
     if ((result.rowCount ?? 0) === 0) {
