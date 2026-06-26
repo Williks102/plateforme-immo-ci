@@ -29,20 +29,21 @@ export default function NouveauBienPage() {
   const toggle = (k: string) => setForm(f => ({ ...f, [k]: !f[k as keyof FormState] } as FormState));
 
   const uploadPhoto = async (file: File) => {
-    // Compression côté client avant upload
+    // Compression côté client — useWebWorker:false évite le chargement
+    // de browser-image-compression depuis cdn.jsdelivr.net (violait la CSP)
     const { default: imageCompression } = await import('browser-image-compression');
     const compressed = await imageCompression(file, {
       maxSizeMB: 0.8,
       maxWidthOrHeight: 1280,
-      useWebWorker: true,
+      useWebWorker: false,
     });
 
     const fd = new FormData();
     fd.append('file', compressed);
     const res = await fetch('/api/upload', { method: 'POST', body: fd });
-    if (!res.ok) throw new Error('Upload échoué');
-    const { url } = await res.json();
-    return url as string;
+    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    if (!res.ok) throw new Error(data.error ?? 'Upload échoué');
+    return data.url as string;
   };
 
   const handleFiles = async (files: FileList | null) => {
@@ -55,8 +56,8 @@ export default function NouveauBienPage() {
         urls.push(url);
       }
       set('photos', [...form.photos, ...urls]);
-    } catch {
-      setError('Erreur lors de l\'upload des photos');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Erreur lors de l\'upload des photos');
     } finally {
       setLoading(false);
     }
