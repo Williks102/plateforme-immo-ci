@@ -10,10 +10,10 @@ export async function uploadToCloudinary(buffer: Buffer, contentType: string): P
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
 
-  // Signature HMAC-SHA1 requise par Cloudinary
-  const { createHmac } = await import('crypto');
+  // Cloudinary : SHA1(params_triés_par_ordre_alpha + api_secret) — PAS un HMAC
+  const { createHash } = await import('crypto');
   const sigPayload = `folder=listings&timestamp=${timestamp}${apiSecret}`;
-  const signature  = createHmac('sha1', apiSecret).update(sigPayload).digest('hex');
+  const signature  = createHash('sha1').update(sigPayload).digest('hex');
 
   const form = new FormData();
   // Uint8Array évite l'incompatibilité Buffer<ArrayBufferLike> vs BlobPart sur Node 24
