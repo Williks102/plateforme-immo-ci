@@ -16,7 +16,8 @@ export async function uploadToCloudinary(buffer: Buffer, contentType: string): P
   const signature  = createHmac('sha1', apiSecret).update(sigPayload).digest('hex');
 
   const form = new FormData();
-  const blob = new Blob([buffer], { type: contentType });
+  // Uint8Array évite l'incompatibilité Buffer<ArrayBufferLike> vs BlobPart sur Node 24
+  const blob = new Blob([new Uint8Array(buffer)], { type: contentType });
   form.append('file', blob, 'upload');
   form.append('api_key', apiKey);
   form.append('timestamp', timestamp);
