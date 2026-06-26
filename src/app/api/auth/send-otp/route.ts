@@ -7,7 +7,6 @@ import { sendSMS } from '@/lib/sms';
 
 const ratelimit = new Ratelimit({
   redis: Redis.fromEnv(),
-  // Max 3 SMS par téléphone par heure — anti-spam facture SMS
   limiter: Ratelimit.slidingWindow(3, '1 h'),
 });
 
@@ -20,7 +19,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { phone } = schema.parse(body);
 
-    // Rate limiting par numéro de téléphone
     const { success } = await ratelimit.limit(`send_otp:${phone}`);
     if (!success) {
       return NextResponse.json(
@@ -32,18 +30,29 @@ export async function POST(req: NextRequest) {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Invalider les anciens codes non utilisés
     await db.query(
       'UPDATE otp_codes SET used = TRUE WHERE phone = $1 AND used = FALSE',
       [phone]
     );
-
     await db.query(
       'INSERT INTO otp_codes (phone, code, expires_at) VALUES ($1, $2, $3)',
       [phone, code, expiresAt]
     );
 
-    await sendSMS(phone, `Votre code de connexion ImmoCI : ${code}. Valable 10 minutes.`);
+    const result = await sendSMS(
+      phone,
+      `Votre code de connexion ImmoCI : ${code}. Valable 10 minutes.`
+    );
+
+    // Mode test (pas de provider SMS) : renvoyer le code dans la réponse
+    if (!result.sent) {
+      return NextResponse.json({
+        success: true,
+        _testMode: true,
+        _code: result.testCode,
+        _notice: 'CONFIGUREZ SMS_PROVIDER_API_KEY pour les SMS réels',
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

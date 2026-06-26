@@ -13,6 +13,7 @@ export function OTPForm({ redirectTo = '/' }: Props) {
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [testCode, setTestCode] = useState('');
 
   const formatPhone = (val: string) => {
     const digits = val.replace(/\D/g, '');
@@ -33,6 +34,8 @@ export function OTPForm({ redirectTo = '/' }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setPhone(formattedPhone);
+      // Mode test : le code est renvoyé directement dans la réponse
+      if (data._testMode && data._code) setTestCode(data._code);
       setStep('code');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erreur inconnue');
@@ -101,7 +104,13 @@ export function OTPForm({ redirectTo = '/' }: Props) {
               placeholder="123456"
               className="w-full px-4 py-3 border rounded-xl text-center text-3xl tracking-widest focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
-            <p className="text-xs text-gray-500 mt-1">Code envoyé au {phone}</p>
+            {testCode ? (
+              <p className="text-xs text-amber-600 font-mono mt-1 bg-amber-50 px-2 py-1 rounded">
+                Mode test — code : <strong>{testCode}</strong>
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">Code envoyé au {phone}</p>
+            )}
           </div>
           <button
             onClick={verifyOTP}
