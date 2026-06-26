@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 
-const allowedOrigins = [
-  process.env.NEXTAUTH_URL ?? 'http://localhost:3000',
-  ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),
-].filter(Boolean);
 
 const ADMIN_PATHS   = ['/admin', '/api/admin'];
 const PRIVATE_PATHS = ['/dashboard', '/biens/nouveau', '/reservations'];
@@ -44,12 +40,14 @@ export async function proxy(req: NextRequest) {
   const reqHeaders = new Headers(req.headers);
   reqHeaders.set('x-nonce', nonce);
 
-  // CORS — bloquer les origines non whitelistées sur les routes API
+  // CORS — bloquer uniquement les requêtes cross-origin non autorisées
   if (pathname.startsWith('/api/')) {
     const origin = req.headers.get('origin');
-    if (origin && !allowedOrigins.includes(origin)) {
-      const paiementProOrigin = process.env.PAYMENT_PRO_CALLBACK_ORIGIN ?? 'https://paiementpro.net';
-      if (!(pathname.startsWith('/api/webhooks/') && origin === paiementProOrigin)) {
+    if (origin) {
+      const isSameOrigin = new URL(origin).host === req.nextUrl.host;
+      const isPaiementPro = pathname.startsWith('/api/webhooks/') &&
+        origin === (process.env.PAYMENT_PRO_CALLBACK_ORIGIN ?? 'https://paiementpro.net');
+      if (!isSameOrigin && !isPaiementPro) {
         return new NextResponse('Forbidden', { status: 403 });
       }
     }
