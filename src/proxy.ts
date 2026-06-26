@@ -9,7 +9,7 @@ const allowedOrigins = [
 const ADMIN_PATHS   = ['/admin', '/api/admin'];
 const PRIVATE_PATHS = ['/dashboard', '/biens/nouveau', '/reservations'];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // CORS — bloquer les origines non whitelistées sur les routes API

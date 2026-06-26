@@ -24,8 +24,9 @@ export default function NouveauBienPage() {
     photos: [] as string[],
   });
 
-  const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v }));
-  const toggle = (k: string) => setForm(f => ({ ...f, [k]: !f[k as keyof typeof f] }));
+  type FormState = typeof form;
+  const set = (k: string, v: unknown) => setForm(f => ({ ...f, [k]: v } as FormState));
+  const toggle = (k: string) => setForm(f => ({ ...f, [k]: !f[k as keyof FormState] } as FormState));
 
   const uploadPhoto = async (file: File) => {
     // Compression côté client avant upload

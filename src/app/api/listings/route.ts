@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ listings: result.rows });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: err.errors[0].message }, { status: 400 });
+      return NextResponse.json({ error: err.issues[0].message }, { status: 400 });
     }
     console.error('[GET /api/listings]', err);
     return NextResponse.json({ error: 'Erreur interne' }, { status: 500 });
@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ id: listingId }, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: err.errors[0].message }, { status: 400 });
+      return NextResponse.json({ error: err.issues[0].message }, { status: 400 });
     }
     console.error('[POST /api/listings]', err);
     return NextResponse.json({ error: 'Erreur interne' }, { status: 500 });

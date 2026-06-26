@@ -2,7 +2,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export const s3Client = new S3Client({
-  endpoint: process.env.DO_SPACES_ENDPOINT,
+  endpoint: process.env.DO_SPACES_ENDPOINT!,
   region: 'fra1',
   credentials: {
     accessKeyId: process.env.DO_SPACES_KEY!,

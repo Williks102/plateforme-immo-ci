@@ -1,4 +1,3 @@
-import { Suspense } from 'react';
 import Link from 'next/link';
 import { db } from '@/lib/db';
 import { ListingCard } from '@/components/ListingCard';
@@ -144,7 +143,7 @@ export default async function RecherchePage({ searchParams }: Props) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {listings.map(l => (
-              <ListingCard key={l.id as string} {...(l as Parameters<typeof ListingCard>[0])} />
+              <ListingCard key={l.id as string} {...(l as unknown as Parameters<typeof ListingCard>[0])} />
             ))}
           </div>
         )}

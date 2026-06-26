@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { DayPicker, DateRange } from 'react-day-picker';
 import { fr } from 'date-fns/locale';
-import 'react-day-picker/dist/style.css';
+import 'react-day-picker/style.css';
 
 interface Props {
   listingId: string;
