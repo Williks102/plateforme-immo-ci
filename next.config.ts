@@ -16,8 +16,9 @@ const securityHeaders = [
       // 'unsafe-inline' requis : Next.js injecte des scripts inline pour l'hydration
       `script-src 'self' 'unsafe-inline' https://api.mapbox.com https://www.paiementpro.net`,
       `style-src 'self' 'unsafe-inline' https://api.mapbox.com`,
-      `img-src 'self' blob: data: https://*.digitaloceanspaces.com https://api.mapbox.com`,
-      `connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://www.paiementpro.net ${PAYMENT_ORIGINS}`,
+      `img-src 'self' blob: data: https://*.digitaloceanspaces.com https://api.mapbox.com https://res.cloudinary.com`,
+      `connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://www.paiementpro.net ${PAYMENT_ORIGINS} https://res.cloudinary.com`,
+      `worker-src blob: 'self'`,
       `frame-src 'self' https://www.paiementpro.net`,
       "object-src 'none'",
       "base-uri 'self'",
@@ -39,6 +40,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: 'https', hostname: '*.digitaloceanspaces.com' },
       { protocol: 'https', hostname: '*.s3.amazonaws.com' },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
     ],
     formats: ['image/webp'],
   },
