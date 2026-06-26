@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { timingSafeEqual } from 'crypto';
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
 import { db } from '@/lib/db';
 import { createSession, sessionCookieOptions } from '@/lib/auth';
-
-const verifyRatelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  // Max 5 tentatives par IP par 10 minutes — un code 6 chiffres sans limite = brute force trivial
-  limiter: Ratelimit.slidingWindow(5, '10 m'),
-});
 
 const schema = z.object({
   phone: z.string().regex(/^\+225\d{10}$/),
@@ -19,15 +11,6 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get('x-forwarded-for') ?? 'anonymous';
-    const { success } = await verifyRatelimit.limit(`verify_otp:${ip}`);
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Trop de tentatives. Réessayez dans 10 minutes.' },
-        { status: 429 }
-      );
-    }
-
     const { phone, code } = schema.parse(await req.json());
 
     const result = await db.query(

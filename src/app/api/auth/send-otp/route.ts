@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
 import { db } from '@/lib/db';
 import { sendSMS } from '@/lib/sms';
-
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(3, '1 h'),
-});
 
 const schema = z.object({
   phone: z.string().regex(/^\+225\d{10}$/, 'Numéro ivoirien invalide (+225XXXXXXXXXX)'),
@@ -18,14 +11,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { phone } = schema.parse(body);
-
-    const { success } = await ratelimit.limit(`send_otp:${phone}`);
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Trop de tentatives. Réessayez dans 1 heure.' },
-        { status: 429 }
-      );
-    }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
