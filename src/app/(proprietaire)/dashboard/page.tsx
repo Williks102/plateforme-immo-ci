@@ -53,7 +53,9 @@ export default async function DashboardPage({
   const token = cookieStore.get('immo_session')?.value;
   const session = token ? await getSession() : null;
 
-  if (!session) redirect('/connexion');
+  if (!session) redirect('/connexion?redirect=/dashboard');
+  if (session.role === 'client') redirect('/reservations');
+  if (session.role === 'admin')  redirect('/admin');
 
   const sp = await searchParams;
   const { bookings, listings } = await getOwnerStats(session.userId);

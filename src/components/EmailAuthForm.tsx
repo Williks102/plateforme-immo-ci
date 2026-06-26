@@ -9,14 +9,20 @@ interface Props {
   redirectTo?: string;
 }
 
-export function EmailAuthForm({ redirectTo = '/' }: Props) {
+const ROLE_HOME: Record<string, string> = {
+  admin:        '/admin',
+  proprietaire: '/dashboard',
+  client:       '/reservations',
+};
+
+export function EmailAuthForm({ redirectTo }: Props) {
   const router = useRouter();
-  const [tab, setTab]         = useState<Tab>('login');
-  const [email, setEmail]     = useState('');
+  const [tab, setTab]           = useState<Tab>('login');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole]       = useState<Role>('client');
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
+  const [role, setRole]         = useState<Role>('client');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
 
   const submit = async () => {
     setLoading(true);
@@ -35,7 +41,9 @@ export function EmailAuthForm({ redirectTo = '/' }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      router.push(data.role === 'admin' ? '/admin' : redirectTo);
+      // Priorité : 1) redirect explicite de l'URL  2) page d'accueil du rôle
+      const destination = redirectTo ?? ROLE_HOME[data.role] ?? '/';
+      router.push(destination);
       router.refresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Erreur inconnue');
@@ -127,11 +135,7 @@ export function EmailAuthForm({ redirectTo = '/' }: Props) {
         disabled={loading || !email || password.length < (tab === 'register' ? 8 : 1)}
         className="w-full bg-orange-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50 hover:bg-orange-700 transition-colors"
       >
-        {loading
-          ? '...'
-          : tab === 'login'
-            ? 'Se connecter'
-            : 'Créer mon compte'}
+        {loading ? '...' : tab === 'login' ? 'Se connecter' : 'Créer mon compte'}
       </button>
     </div>
   );

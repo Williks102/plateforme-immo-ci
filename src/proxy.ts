@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 
 const ADMIN_PATHS   = ['/admin', '/api/admin'];
-const PRIVATE_PATHS = ['/dashboard', '/biens/nouveau', '/reservations'];
+const PRIVATE_PATHS = ['/dashboard', '/biens/nouveau', '/reservations']; // /reservations couvre liste + [id]/confirmation
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
