@@ -10,7 +10,7 @@ const COOKIE_NAME = 'immo_session';
 
 export interface Session {
   userId: string;
-  phone: string;
+  email: string;
   role: 'client' | 'proprietaire' | 'admin';
   jti: string;
 }
@@ -52,7 +52,7 @@ export function sessionCookieOptions(token: string) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict' as const,
-    maxAge: 60 * 60 * 24 * 7, // 7 jours
+    maxAge: 60 * 60 * 24 * 7,
     path: '/',
   };
 }

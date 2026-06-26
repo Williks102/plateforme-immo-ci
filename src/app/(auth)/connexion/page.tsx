@@ -1,4 +1,4 @@
-import { OTPForm } from '@/components/OTPForm';
+import { EmailAuthForm } from '@/components/EmailAuthForm';
 
 export default function ConnexionPage() {
   return (
@@ -6,9 +6,9 @@ export default function ConnexionPage() {
       <div className="bg-white rounded-2xl shadow p-8 w-full max-w-sm">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">ImmoCI</h1>
-          <p className="text-gray-500 mt-1">Connectez-vous avec votre numéro</p>
+          <p className="text-gray-500 mt-1">Locations en Côte d'Ivoire</p>
         </div>
-        <OTPForm redirectTo="/" />
+        <EmailAuthForm redirectTo="/" />
       </div>
     </main>
   );

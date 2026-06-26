@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     const session = await createSession({
       userId: user.rows[0].id,
-      phone,
+      email: phone, // OTP désactivé — phone stocké dans email temporairement
       role: user.rows[0].role,
     });
 
