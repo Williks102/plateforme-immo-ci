@@ -30,23 +30,31 @@ function computePrice(
 const PAIEMENTPRO_SDK_URL =
   'https://www.paiementpro.net/webservice/onlinepayment/js/paiementpro.v1.0.2.js';
 
-// Singleton module-level : le SDK v1.0.2 déclare PaiementPro avec `let` (non sur window).
-// Injecter le <script> deux fois provoque "Identifier already declared".
-// On mémorise la Promise dès le premier appel pour que tous les appels suivants
-// attendent le même chargement sans créer un deuxième <script>.
+// Singleton module-level : le SDK v1.0.2 déclare PaiementPro avec `let`
+// (non attaché à window/globalThis). Injecter le <script> deux fois provoque
+// "Identifier already declared". On mémorise la Promise dès le premier appel.
 let _sdkPromise: Promise<void> | null = null;
 
 function loadPaiementProSdk(): Promise<void> {
   if (_sdkPromise) return _sdkPromise;
   _sdkPromise = new Promise<void>((resolve, reject) => {
-    // Au cas où le <script> existe déjà dans le DOM (ex : HMR dev)
+    // Déjà dans le DOM → déjà résolu (HMR / navigation SPA)
     if (document.querySelector(`script[src="${PAIEMENTPRO_SDK_URL}"]`)) {
       resolve();
       return;
     }
     const script = document.createElement('script');
-    script.src     = PAIEMENTPRO_SDK_URL;
-    script.onload  = () => resolve();
+    script.src = PAIEMENTPRO_SDK_URL;
+    script.onload = () => {
+      // Le SDK utilise `let PaiementPro` → invisible sur window depuis un ES module.
+      // Un script inline classique partage le scope global lexical et peut faire le pont.
+      // 'unsafe-inline' est déjà autorisé dans notre CSP script-src.
+      const bridge = document.createElement('script');
+      bridge.textContent =
+        'if(typeof PaiementPro!=="undefined")window.__PaiementPro=PaiementPro;';
+      document.head.appendChild(bridge); // exécuté de façon synchrone
+      resolve();
+    };
     script.onerror = () => {
       _sdkPromise = null; // autorise un retry sur erreur réseau
       reject(new Error('Impossible de charger le SDK de paiement'));
@@ -90,10 +98,10 @@ export function BookingWidget({ listingId, prixNuitee, remiseSemainePct, remiseM
       setStep('Initialisation du paiement…');
       await loadPaiementProSdk();
 
-      // Le SDK v1.0.2 utilise `let PaiementPro` (non attaché à window).
-      // On lit la variable via globalThis qui partage le scope lexical des scripts.
+      // window.__PaiementPro est exposé par le script bridge inline dans loadPaiementProSdk()
+      // (le SDK déclare PaiementPro avec `let` → invisible sur window depuis un ES module)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const PaiementProSDK = (globalThis as any).PaiementPro as
+      const PaiementProSDK = (window as any).__PaiementPro as
         | (new (merchantId: string) => {
             amount: number;
             referenceNumber: string;
