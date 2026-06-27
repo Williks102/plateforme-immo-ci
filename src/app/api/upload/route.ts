@@ -13,19 +13,19 @@ const WATERMARK_SVG = Buffer.from(
   'fill="white" fill-opacity="0.55">ImmoCI.ci</text></svg>'
 );
 
-async function processImage(buffer: Buffer): Promise<Buffer> {
+async function processImage(buf: Buffer<ArrayBufferLike>): Promise<Buffer<ArrayBufferLike>> {
   const sharp = (await import('sharp')).default;
-  return sharp(buffer)
+  return sharp(buf)
     .resize(1280, 960, { fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 82 })
     .composite([{ input: WATERMARK_SVG, gravity: 'southeast' }])
-    .toBuffer();
+    .toBuffer() as Promise<Buffer<ArrayBufferLike>>;
 }
 
-async function computePHash(buffer: Buffer): Promise<string | null> {
+async function computePHash(buf: Buffer<ArrayBufferLike>): Promise<string | null> {
   try {
     const sharp = (await import('sharp')).default;
-    const { data } = await sharp(buffer)
+    const { data } = await sharp(buf)
       .resize(8, 8, { fit: 'fill' })
       .grayscale()
       .raw()
@@ -67,8 +67,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Fichier trop volumineux (max 5 Mo)' }, { status: 413 });
     }
 
-    const rawBuffer = Buffer.from(new Uint8Array(await file.arrayBuffer()));
-    const detected  = await fileTypeFromBuffer(rawBuffer);
+    // Buffer<ArrayBufferLike> — consistent with what sharp and file-type expect
+    const rawBuffer: Buffer<ArrayBufferLike> = Buffer.from(await file.arrayBuffer());
+    const detected = await fileTypeFromBuffer(rawBuffer);
 
     if (!detected || !ALLOWED_MIME.includes(detected.mime)) {
       return NextResponse.json({ error: 'Type de fichier non autorisé (jpg, png, webp uniquement)' }, { status: 415 });
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     const phashHex = await computePHash(rawBuffer);
 
     // Process: resize + watermark + WebP
-    let buffer = rawBuffer;
+    let buffer: Buffer<ArrayBufferLike> = rawBuffer;
     let mimeType = detected.mime;
     try {
       buffer   = await processImage(rawBuffer);
@@ -90,12 +91,12 @@ export async function POST(req: NextRequest) {
     let url: string;
 
     if (hasCloudinary) {
-      url = await uploadToCloudinary(buffer, mimeType);
+      url = await uploadToCloudinary(buffer as Buffer, mimeType);
     } else {
       const { uploadToS3 } = await import('@/lib/s3');
       url = await uploadToS3({
         key: `listings/${randomUUID()}.webp`,
-        body: buffer,
+        body: buffer as Buffer,
         contentType: mimeType,
         isPublic: true,
       });
