@@ -27,36 +27,26 @@ function computePrice(
   return { prixEffectif, total, remisePct, remiseMontant };
 }
 
-const PAIEMENTPRO_SDK_URL =
-  'https://www.paiementpro.net/webservice/onlinepayment/js/paiementpro.v1.0.2.js';
+// SDK servi via notre propre proxy (/api/paiementpro-sdk) qui enveloppe le code
+// du SDK dans une IIFE et assigne window.PaiementPro explicitement.
+// Avantages : origin 'self' (CSP), pas de bridge inline, pas d'unsafe-eval.
+const PAIEMENTPRO_SDK_URL = '/api/paiementpro-sdk';
 
-// Singleton module-level : le SDK v1.0.2 déclare PaiementPro avec `let`
-// (non attaché à window/globalThis). Injecter le <script> deux fois provoque
-// "Identifier already declared". On mémorise la Promise dès le premier appel.
+// Singleton module-level — un seul <script> quel que soit le nombre d'appels.
 let _sdkPromise: Promise<void> | null = null;
 
 function loadPaiementProSdk(): Promise<void> {
   if (_sdkPromise) return _sdkPromise;
   _sdkPromise = new Promise<void>((resolve, reject) => {
-    // Déjà dans le DOM → déjà résolu (HMR / navigation SPA)
     if (document.querySelector(`script[src="${PAIEMENTPRO_SDK_URL}"]`)) {
       resolve();
       return;
     }
     const script = document.createElement('script');
-    script.src = PAIEMENTPRO_SDK_URL;
-    script.onload = () => {
-      // Le SDK utilise `let PaiementPro` → invisible sur window depuis un ES module.
-      // Un script inline classique partage le scope global lexical et peut faire le pont.
-      // 'unsafe-inline' est déjà autorisé dans notre CSP script-src.
-      const bridge = document.createElement('script');
-      bridge.textContent =
-        'if(typeof PaiementPro!=="undefined")window.__PaiementPro=PaiementPro;';
-      document.head.appendChild(bridge); // exécuté de façon synchrone
-      resolve();
-    };
+    script.src     = PAIEMENTPRO_SDK_URL;
+    script.onload  = () => resolve();
     script.onerror = () => {
-      _sdkPromise = null; // autorise un retry sur erreur réseau
+      _sdkPromise = null;
       reject(new Error('Impossible de charger le SDK de paiement'));
     };
     document.head.appendChild(script);
@@ -98,10 +88,9 @@ export function BookingWidget({ listingId, prixNuitee, remiseSemainePct, remiseM
       setStep('Initialisation du paiement…');
       await loadPaiementProSdk();
 
-      // window.__PaiementPro est exposé par le script bridge inline dans loadPaiementProSdk()
-      // (le SDK déclare PaiementPro avec `let` → invisible sur window depuis un ES module)
+      // Le proxy /api/paiementpro-sdk enveloppe le SDK et assigne window.PaiementPro.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const PaiementProSDK = (window as any).__PaiementPro as
+      const PaiementProSDK = (window as any).PaiementPro as
         | (new (merchantId: string) => {
             amount: number;
             referenceNumber: string;
