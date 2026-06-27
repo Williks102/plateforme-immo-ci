@@ -20,7 +20,9 @@ ALTER TABLE bookings
   ADD COLUMN IF NOT EXISTS remise_appliquee_pct SMALLINT NOT NULL DEFAULT 0;
 
 -- Recréer la vue pour inclure les nouvelles colonnes
-CREATE OR REPLACE VIEW v_published_listings AS
+-- (DROP requis car CREATE OR REPLACE ne peut pas changer l'ordre des colonnes)
+DROP VIEW IF EXISTS v_published_listings;
+CREATE VIEW v_published_listings AS
 SELECT
   l.id, l.owner_id, l.title, l.description,
   l.commune, l.quartier, l.adresse_indicative,
