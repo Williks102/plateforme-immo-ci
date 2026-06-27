@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Fichier trop volumineux (max 5 Mo)' }, { status: 413 });
     }
 
-    const rawBuffer = Buffer.from(await file.arrayBuffer());
+    const rawBuffer = Buffer.from(new Uint8Array(await file.arrayBuffer()));
     const detected  = await fileTypeFromBuffer(rawBuffer);
 
     if (!detected || !ALLOWED_MIME.includes(detected.mime)) {
