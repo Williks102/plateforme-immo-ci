@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 
 async function getOwnerStats(ownerId: string) {
-  const [bookings, listings] = await Promise.all([
+  const [bookings, listings, userRow] = await Promise.all([
     db.query(
       `SELECT b.id, b.check_in, b.check_out, b.total_price, b.status, b.created_at,
               l.title as listing_title
@@ -21,9 +21,10 @@ async function getOwnerStats(ownerId: string) {
        FROM listings WHERE owner_id = $1 ORDER BY created_at DESC`,
       [ownerId]
     ),
+    db.query(`SELECT kyc_status FROM users WHERE id = $1`, [ownerId]),
   ]);
 
-  return { bookings: bookings.rows, listings: listings.rows };
+  return { bookings: bookings.rows, listings: listings.rows, kycStatus: userRow.rows[0]?.kyc_status ?? null };
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -58,7 +59,7 @@ export default async function DashboardPage({
   if (session.role === 'admin')  redirect('/admin');
 
   const sp = await searchParams;
-  const { bookings, listings } = await getOwnerStats(session.userId);
+  const { bookings, listings, kycStatus } = await getOwnerStats(session.userId);
 
   const totalRevenu = bookings
     .filter(b => b.status === 'disbursed_to_owner')
@@ -79,6 +80,30 @@ export default async function DashboardPage({
             ✅ Votre bien a été soumis pour validation. Vous recevrez une notification WhatsApp dès qu'il sera publié.
           </div>
         )}
+
+        {/* KYC banner */}
+        {!kycStatus || kycStatus === 'not_submitted' ? (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-medium text-orange-800">Vérification d'identité requise</p>
+              <p className="text-sm text-orange-700 mt-0.5">Soumettez votre pièce d'identité pour activer les paiements.</p>
+            </div>
+            <Link href="/kyc" className="flex-shrink-0 px-4 py-2 bg-orange-600 text-white text-sm rounded-lg font-medium">
+              Vérifier mon identité →
+            </Link>
+          </div>
+        ) : kycStatus === 'id_submitted' ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <p className="text-yellow-800 text-sm">⏳ Votre document KYC est en cours d'examen (24-48h).</p>
+          </div>
+        ) : kycStatus === 'rejected' ? (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between gap-4">
+            <p className="text-red-800 text-sm">❌ Votre KYC a été rejeté. Veuillez soumettre un nouveau document.</p>
+            <Link href="/kyc" className="flex-shrink-0 px-4 py-2 bg-red-600 text-white text-sm rounded-lg font-medium">
+              Resoumettre →
+            </Link>
+          </div>
+        ) : null}
 
         {/* KPIs */}
         <div className="grid grid-cols-3 gap-4">

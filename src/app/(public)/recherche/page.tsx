@@ -1,152 +1,172 @@
+'use client';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { db } from '@/lib/db';
-import { ListingCard } from '@/components/ListingCard';
+import dynamic from 'next/dynamic';
+
+const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
 
 const COMMUNES = [
-  'Cocody', 'Plateau', 'Marcory', 'Treichville', 'Adjamé',
-  'Yopougon', 'Koumassi', 'Port-Bouët', 'Abobo', 'Attécoubé',
-  'Bingerville', 'Songon',
+  'Cocody','Plateau','Marcory','Treichville','Adjamé',
+  'Yopougon','Koumassi','Port-Bouët','Abobo','Attécoubé','Bingerville','Songon',
 ];
 
-interface SearchParams {
-  commune?: string;
-  prix_min?: string;
-  prix_max?: string;
-  nb_chambres?: string;
-  has_wifi?: string;
-  has_generator?: string;
-  has_split_ac?: string;
-  is_verified?: string;
+interface Listing {
+  id: string;
+  title: string;
+  prix_nuitee: number;
+  commune: string;
+  quartier: string;
+  avg_rating: number;
+  review_count: number;
+  cover_photo: string | null;
+  is_verified: boolean;
+  lat: number | null;
+  lng: number | null;
 }
 
-async function searchListings(sp: SearchParams) {
-  const params: unknown[] = [
-    sp.commune || null,
-    sp.prix_min ? Number(sp.prix_min) : null,
-    sp.prix_max ? Number(sp.prix_max) : null,
-    sp.nb_chambres ? Number(sp.nb_chambres) : null,
-    sp.has_generator === '1' ? true : null,
-    sp.has_wifi === '1' ? true : null,
-    sp.has_split_ac === '1' ? true : null,
-    sp.is_verified === '1' ? true : null,
-    20, // limit
-    0,  // offset
-  ];
+export default function RecherchePage() {
+  const [commune, setCommune]       = useState('');
+  const [prixMin, setPrixMin]       = useState('');
+  const [prixMax, setPrixMax]       = useState('');
+  const [chambres, setChambres]     = useState('');
+  const [wifi, setWifi]             = useState(false);
+  const [generator, setGenerator]   = useState(false);
+  const [clim, setClim]             = useState(false);
+  const [verifie, setVerifie]       = useState(false);
+  const [results, setResults]       = useState<Listing[]>([]);
+  const [loading, setLoading]       = useState(false);
+  const [hoveredId, setHoveredId]   = useState<string | null>(null);
 
-  const result = await db.query(
-    `SELECT id, title, prix_nuitee, commune, quartier, avg_rating, review_count,
-            photos[1] as cover_photo, is_verified
-     FROM v_published_listings
-     WHERE ($1::text IS NULL OR commune = $1)
-       AND ($2::numeric IS NULL OR prix_nuitee >= $2)
-       AND ($3::numeric IS NULL OR prix_nuitee <= $3)
-       AND ($4::int IS NULL OR nb_chambres >= $4)
-       AND ($5::boolean IS NULL OR has_generator = $5)
-       AND ($6::boolean IS NULL OR has_wifi = $6)
-       AND ($7::boolean IS NULL OR has_split_ac = $7)
-       AND ($8::boolean IS NULL OR is_verified = $8)
-     ORDER BY is_verified DESC, avg_rating DESC
-     LIMIT $9 OFFSET $10`,
-    params
-  );
-  return result.rows;
-}
+  const search = useCallback(async () => {
+    setLoading(true);
+    try {
+      const p = new URLSearchParams();
+      if (commune)   p.set('commune', commune);
+      if (prixMin)   p.set('prix_min', prixMin);
+      if (prixMax)   p.set('prix_max', prixMax);
+      if (chambres)  p.set('nb_chambres', chambres);
+      if (wifi)      p.set('has_wifi', 'true');
+      if (generator) p.set('has_generator', 'true');
+      if (clim)      p.set('has_split_ac', 'true');
+      if (verifie)   p.set('is_verified', 'true');
 
-interface Props {
-  searchParams: Promise<SearchParams>;
-}
+      const res = await fetch(`/api/listings/search?${p}`);
+      const data = await res.json();
+      setResults(data.listings ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, [commune, prixMin, prixMax, chambres, wifi, generator, clim, verifie]);
 
-export default async function RecherchePage({ searchParams }: Props) {
-  const sp = await searchParams;
-  let listings: Record<string, unknown>[] = [];
-  try {
-    listings = await searchListings(sp);
-  } catch {
-    listings = [];
-  }
+  useEffect(() => { search(); }, [search]);
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
-          <Link href="/" className="text-xl font-bold text-orange-600">ImmoCI</Link>
-          <span className="text-gray-400">/ Recherche</span>
+      {/* Filtres */}
+      <div className="bg-white border-b px-4 py-4 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-wrap gap-3 items-end">
+            <Link href="/" className="text-lg font-bold text-orange-600 mr-2">ImmoCI</Link>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Commune</label>
+              <select
+                value={commune}
+                onChange={e => setCommune(e.target.value)}
+                className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="">Toutes</option>
+                {COMMUNES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Prix min (FCFA)</label>
+              <input
+                type="number" value={prixMin} onChange={e => setPrixMin(e.target.value)}
+                placeholder="5 000" className="w-28 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Prix max (FCFA)</label>
+              <input
+                type="number" value={prixMax} onChange={e => setPrixMax(e.target.value)}
+                placeholder="200 000" className="w-28 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Chambres min</label>
+              <input
+                type="number" value={chambres} onChange={e => setChambres(e.target.value)}
+                min="1" max="20" placeholder="1" className="w-20 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              {[
+                { label: 'WiFi', val: wifi, set: setWifi },
+                { label: 'Groupe élec.', val: generator, set: setGenerator },
+                { label: 'Clim', val: clim, set: setClim },
+                { label: 'Vérifiés', val: verifie, set: setVerifie },
+              ].map(f => (
+                <label key={f.label} className="flex items-center gap-1.5 cursor-pointer text-sm">
+                  <input type="checkbox" checked={f.val} onChange={e => f.set(e.target.checked)} className="accent-orange-600" />
+                  {f.label}
+                </label>
+              ))}
+            </div>
+            <button
+              onClick={search}
+              disabled={loading}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-orange-700"
+            >
+              {loading ? 'Chargement...' : 'Rechercher'}
+            </button>
+          </div>
         </div>
-      </header>
+      </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        {/* Filtres */}
-        <form className="bg-white rounded-2xl shadow p-4 mb-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-          <select name="commune" defaultValue={sp.commune ?? ''} className="px-3 py-2 border rounded-xl text-sm">
-            <option value="">Toutes communes</option>
-            {COMMUNES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+      {/* Résultats + carte */}
+      <div className="max-w-6xl mx-auto flex gap-4 p-4" style={{ height: 'calc(100vh - 100px)' }}>
+        {/* Liste */}
+        <div className="w-80 flex-shrink-0 overflow-y-auto space-y-3 pr-1">
+          <p className="text-sm text-gray-500">{results.length} résultat{results.length !== 1 ? 's' : ''}</p>
+          {results.length === 0 && !loading && (
+            <p className="text-gray-400 text-sm">Aucun bien trouvé avec ces filtres.</p>
+          )}
+          {results.map(l => (
+            <Link
+              key={l.id}
+              href={`/listings/${l.id}`}
+              onMouseEnter={() => setHoveredId(l.id)}
+              onMouseLeave={() => setHoveredId(null)}
+              className={`block bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow ${hoveredId === l.id ? 'ring-2 ring-orange-500' : ''}`}
+            >
+              {l.cover_photo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={l.cover_photo} alt={l.title} className="w-full h-32 object-cover" />
+              )}
+              {!l.cover_photo && (
+                <div className="w-full h-32 bg-gray-100 flex items-center justify-center text-gray-300 text-3xl">🏠</div>
+              )}
+              <div className="p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium text-sm line-clamp-2">{l.title}</p>
+                  {l.is_verified && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">✓ Vérifié</span>}
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">{l.quartier ? `${l.quartier}, ` : ''}{l.commune}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-sm font-bold text-orange-600">{Number(l.prix_nuitee).toLocaleString('fr-CI')} FCFA/nuit</p>
+                  {l.avg_rating > 0 && (
+                    <span className="text-xs text-gray-500">★ {Number(l.avg_rating).toFixed(1)} ({l.review_count})</span>
+                  )}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
 
-          <input
-            type="number"
-            name="prix_min"
-            defaultValue={sp.prix_min}
-            placeholder="Prix min (FCFA)"
-            className="px-3 py-2 border rounded-xl text-sm"
-          />
-
-          <input
-            type="number"
-            name="prix_max"
-            defaultValue={sp.prix_max}
-            placeholder="Prix max (FCFA)"
-            className="px-3 py-2 border rounded-xl text-sm"
-          />
-
-          <select name="nb_chambres" defaultValue={sp.nb_chambres ?? ''} className="px-3 py-2 border rounded-xl text-sm">
-            <option value="">Toutes chambres</option>
-            {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}+ chambre{n > 1 ? 's' : ''}</option>)}
-          </select>
-
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="has_wifi" value="1" defaultChecked={sp.has_wifi === '1'} />
-            WiFi
-          </label>
-
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="has_generator" value="1" defaultChecked={sp.has_generator === '1'} />
-            Groupe élec.
-          </label>
-
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="has_split_ac" value="1" defaultChecked={sp.has_split_ac === '1'} />
-            Climatisation
-          </label>
-
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="is_verified" value="1" defaultChecked={sp.is_verified === '1'} />
-            Vérifiés uniquement
-          </label>
-
-          <button
-            type="submit"
-            className="col-span-2 md:col-span-4 bg-orange-600 text-white py-2 rounded-xl text-sm font-semibold"
-          >
-            Rechercher
-          </button>
-        </form>
-
-        {/* Résultats */}
-        <p className="text-sm text-gray-500 mb-4">{listings.length} bien{listings.length > 1 ? 's' : ''} trouvé{listings.length > 1 ? 's' : ''}</p>
-
-        {listings.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <p className="text-4xl mb-3">🔍</p>
-            <p>Aucun bien ne correspond à vos critères.</p>
-            <Link href="/recherche" className="text-orange-600 mt-2 inline-block">Effacer les filtres</Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {listings.map(l => (
-              <ListingCard key={l.id as string} {...(l as unknown as Parameters<typeof ListingCard>[0])} />
-            ))}
-          </div>
-        )}
+        {/* Carte Mapbox */}
+        <div className="flex-1 rounded-2xl overflow-hidden shadow-sm">
+          <MapView listings={results} hoveredId={hoveredId} />
+        </div>
       </div>
     </main>
   );
