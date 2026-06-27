@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 
 interface AuditLog {
   id: string;
@@ -44,12 +43,8 @@ export default function AdminAuditPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <Link href="/admin" className="text-gray-500 hover:text-gray-700">← Admin</Link>
-          <h1 className="text-2xl font-bold text-gray-900">Journal d'audit</h1>
-        </div>
+    <div className="p-8 max-w-5xl">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Journal d'audit</h1>
 
         {/* Filtres */}
         <div className="bg-white rounded-2xl shadow-sm p-4 mb-6 flex gap-3 items-end">
@@ -133,7 +128,6 @@ export default function AdminAuditPage() {
             Suivant
           </button>
         </div>
-      </div>
-    </main>
+    </div>
   );
 }

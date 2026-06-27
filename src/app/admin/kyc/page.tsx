@@ -44,12 +44,8 @@ export default function AdminKycPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <Link href="/admin" className="text-gray-500 hover:text-gray-700">← Admin</Link>
-          <h1 className="text-2xl font-bold text-gray-900">Vérification KYC</h1>
-        </div>
+    <div className="p-8 max-w-4xl">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Vérification KYC</h1>
 
         {loading ? (
           <p className="text-gray-400">Chargement...</p>
@@ -117,7 +113,6 @@ export default function AdminKycPage() {
             ))}
           </div>
         )}
-      </div>
-    </main>
+    </div>
   );
 }

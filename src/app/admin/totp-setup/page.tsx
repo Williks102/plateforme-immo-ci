@@ -53,21 +53,21 @@ export default function AdminTotpSetupPage() {
 
   if (success) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="flex items-center justify-center p-8 min-h-[80vh]">
         <div className="bg-white rounded-2xl shadow-sm p-8 text-center max-w-sm">
           <p className="text-5xl mb-4">✅</p>
           <h2 className="text-xl font-bold text-gray-900 mb-2">2FA Activée</h2>
           <p className="text-gray-500 text-sm">L'authentification à deux facteurs est active sur votre compte admin.</p>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!data) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="flex items-center justify-center p-8 min-h-[80vh]">
         <p className="text-gray-400">{error || 'Chargement...'}</p>
-      </main>
+      </div>
     );
   }
 

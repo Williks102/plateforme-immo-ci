@@ -1,118 +1,166 @@
-import { db } from '@/lib/db';
-import { getSession } from '@/lib/auth';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+'use client';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
-async function getPendingListings() {
-  const result = await db.query(
-    `SELECT l.id, l.title, l.commune, l.quartier, l.prix_nuitee, l.photos, l.created_at,
-            u.full_name as owner_name, u.phone as owner_phone, u.kyc_status
-     FROM listings l
-     JOIN users u ON u.id = l.owner_id
-     WHERE l.status = 'pending_review'
-     ORDER BY l.created_at ASC`
-  );
-  return result.rows;
+interface Listing {
+  id: string;
+  title: string;
+  commune: string;
+  quartier: string;
+  prix_nuitee: number;
+  photos: string[];
+  created_at: string;
+  owner_name: string;
+  owner_email: string;
+  kyc_status: string;
+  status: string;
 }
 
-export default async function AdminListingsPage() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('immo_session')?.value;
-  const session = token ? await getSession() : null;
+type Tab = 'pending_review' | 'published' | 'rejected';
 
-  if (!session || session.role !== 'admin') {
-    redirect('/connexion');
-  }
+export default function AdminListingsPage() {
+  const [tab, setTab]         = useState<Tab>('pending_review');
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [busy, setBusy]         = useState<string | null>(null);
 
-  const listings = await getPendingListings();
+  const load = async (status: Tab) => {
+    setLoading(true);
+    const res  = await fetch(`/api/admin/listings?status=${status}`);
+    const data = await res.json();
+    setListings(data.listings ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(tab); }, [tab]);
+
+  const approve = async (id: string) => {
+    setBusy(id);
+    const res = await fetch(`/api/admin/listings/${id}/approve`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      setListings(prev => prev.filter(l => l.id !== id));
+    } else {
+      alert(data.error ?? 'Erreur');
+    }
+    setBusy(null);
+  };
+
+  const reject = async (id: string) => {
+    const reason = prompt('Motif du refus (min 10 caractères) :');
+    if (!reason || reason.length < 10) return;
+    setBusy(id);
+    const res = await fetch(`/api/admin/listings/${id}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setListings(prev => prev.filter(l => l.id !== id));
+    } else {
+      alert(data.error ?? 'Erreur');
+    }
+    setBusy(null);
+  };
+
+  const TABS: { key: Tab; label: string }[] = [
+    { key: 'pending_review', label: 'En attente' },
+    { key: 'published',      label: 'Publiés'    },
+    { key: 'rejected',       label: 'Rejetés'    },
+  ];
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Biens en attente de validation</h1>
-          <Link href="/admin" className="text-orange-600 text-sm">← Tableau de bord</Link>
-        </div>
+    <div className="p-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Gestion des biens</h1>
 
-        {listings.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            Aucun bien en attente de validation.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {listings.map(l => (
-              <div key={l.id} className="bg-white rounded-2xl shadow p-4 flex gap-4">
-                {l.photos?.[0] && (
-                  <div className="relative w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden">
-                    <Image src={l.photos[0]} alt="" fill className="object-cover" />
+      {/* Onglets */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === t.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <p className="text-gray-400">Chargement...</p>
+      ) : listings.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <p className="text-4xl mb-3">📭</p>
+          <p>Aucun bien dans cette catégorie.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {listings.map(l => (
+            <div key={l.id} className="bg-white rounded-2xl shadow-sm p-4 flex gap-4 hover:shadow-md transition-shadow">
+              {l.photos?.[0] ? (
+                <div className="relative w-28 h-24 flex-shrink-0 rounded-xl overflow-hidden">
+                  <Image src={l.photos[0]} alt="" fill className="object-cover" />
+                </div>
+              ) : (
+                <div className="w-28 h-24 flex-shrink-0 rounded-xl bg-gray-100 flex items-center justify-center text-2xl text-gray-300">
+                  🏠
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="font-semibold text-gray-900 truncate">{l.title}</h2>
+                    <p className="text-sm text-gray-500">{l.quartier ? `${l.quartier}, ` : ''}{l.commune}</p>
+                    <p className="text-sm font-medium text-orange-600 mt-0.5">
+                      {Number(l.prix_nuitee).toLocaleString('fr-CI')} FCFA/nuit
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Par : {l.owner_name || l.owner_email}
+                      {l.kyc_status !== 'verified' && (
+                        <span className="ml-2 text-orange-500">(KYC non vérifié)</span>
+                      )}
+                    </p>
                   </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h2 className="font-semibold text-gray-900">{l.title}</h2>
-                      <p className="text-sm text-gray-500">{l.quartier ? `${l.quartier}, ` : ''}{l.commune}</p>
-                      <p className="text-sm text-gray-700 mt-1">
-                        {Number(l.prix_nuitee).toLocaleString('fr-CI')} FCFA/nuit
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Propriétaire : {l.owner_name ?? l.owner_phone}
-                        {l.kyc_status !== 'verified' && (
-                          <span className="ml-2 text-red-500">(KYC non vérifié)</span>
-                        )}
-                      </p>
-                    </div>
-                    <span className="text-xs text-gray-400 whitespace-nowrap">
-                      {new Date(l.created_at).toLocaleDateString('fr-CI')}
-                    </span>
-                  </div>
-                  <div className="flex gap-2 mt-3">
-                    <Link
-                      href={`/admin/listings/${l.id}`}
-                      className="px-4 py-2 text-sm bg-gray-100 rounded-lg font-medium hover:bg-gray-200"
-                    >
-                      Voir détail
-                    </Link>
-                    {l.kyc_status === 'verified' && (
-                      <ApproveButton listingId={l.id} />
-                    )}
-                    <RejectButton listingId={l.id} />
-                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
+                    {new Date(l.created_at).toLocaleDateString('fr-CI')}
+                  </span>
+                </div>
+                <div className="flex gap-2 mt-3 flex-wrap">
+                  <Link
+                    href={`/admin/listings/${l.id}`}
+                    className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200"
+                  >
+                    Voir détail →
+                  </Link>
+                  {tab === 'pending_review' && (
+                    <>
+                      <button
+                        onClick={() => approve(l.id)}
+                        disabled={busy === l.id || l.kyc_status !== 'verified'}
+                        title={l.kyc_status !== 'verified' ? 'KYC requis' : ''}
+                        className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg font-medium disabled:opacity-50 hover:bg-green-700"
+                      >
+                        {busy === l.id ? '...' : '✓ Valider'}
+                      </button>
+                      <button
+                        onClick={() => reject(l.id)}
+                        disabled={busy === l.id}
+                        className="px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg font-medium disabled:opacity-50 hover:bg-red-700"
+                      >
+                        {busy === l.id ? '...' : '✗ Rejeter'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
-
-// Client components pour les actions
-function ApproveButton({ listingId }: { listingId: string }) {
-  return (
-    <form action={`/api/admin/listings/${listingId}/approve`} method="POST">
-      <button
-        type="submit"
-        className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg font-medium"
-      >
-        ✓ Valider
-      </button>
-    </form>
-  );
-}
-
-function RejectButton({ listingId }: { listingId: string }) {
-  return (
-    <form action={`/api/admin/listings/${listingId}/reject`} method="POST">
-      <button
-        type="submit"
-        className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg font-medium"
-      >
-        ✗ Rejeter
-      </button>
-    </form>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
