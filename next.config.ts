@@ -14,7 +14,7 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       // 'unsafe-inline' requis : Next.js injecte des scripts inline pour l'hydration
-      `script-src 'self' 'unsafe-inline' https://api.mapbox.com https://www.paiementpro.net`,
+      `script-src 'self' 'unsafe-inline' https://api.mapbox.com https://paiementpro.net https://www.paiementpro.net`,
       `style-src 'self' 'unsafe-inline' https://api.mapbox.com`,
       `img-src 'self' blob: data: https://*.digitaloceanspaces.com https://api.mapbox.com https://res.cloudinary.com`,
       `connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://www.paiementpro.net ${PAYMENT_ORIGINS} https://res.cloudinary.com`,
