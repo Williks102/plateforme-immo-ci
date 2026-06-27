@@ -118,7 +118,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (!result.success) {
-      await db.query('DELETE FROM bookings WHERE id = $1', [bookingId]);
+      // ROLLBACK annule booking + payment_callback_tokens atomiquement
+      // (ne pas faire DELETE manuellement — FK violation car le token existe déjà)
       await db.query('ROLLBACK');
       return NextResponse.json({ error: "Erreur d'initialisation du paiement" }, { status: 502 });
     }
