@@ -287,7 +287,8 @@ CREATE OR REPLACE VIEW v_published_listings AS
 SELECT
   l.id, l.owner_id, l.title, l.description,
   l.commune, l.quartier, l.adresse_indicative,
-  l.prix_nuitee, l.nb_chambres, l.nb_salles_bain,
+  l.prix_nuitee, l.remise_semaine_pct, l.remise_mois_pct,
+  l.nb_chambres, l.nb_salles_bain,
   l.has_generator, l.has_water_pump, l.has_split_ac,
   l.has_wifi, l.has_parking, l.has_pool,
   l.is_verified, l.avg_rating, l.review_count,

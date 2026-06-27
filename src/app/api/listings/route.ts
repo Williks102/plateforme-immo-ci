@@ -30,7 +30,8 @@ export async function GET(req: NextRequest) {
 
     const result = await db.query(
       `SELECT id, title, prix_nuitee, quartier, commune, avg_rating, review_count,
-              photos[1] as cover_photo, is_verified, lat, lng
+              photos[1] as cover_photo, is_verified, lat, lng,
+              remise_semaine_pct, remise_mois_pct
        FROM v_published_listings
        WHERE ($1::text IS NULL OR commune = $1)
          AND ($2::numeric IS NULL OR prix_nuitee >= $2)
@@ -78,23 +79,25 @@ export async function GET(req: NextRequest) {
 
 // POST /api/listings — créer un bien (propriétaire authentifié)
 const createSchema = z.object({
-  title:            z.string().min(5).max(200),
-  description:      z.string().max(2000).optional(),
-  commune:          z.string().max(100),
-  quartier:         z.string().max(100).optional(),
+  title:              z.string().min(5).max(200),
+  description:        z.string().max(2000).optional(),
+  commune:            z.string().max(100),
+  quartier:           z.string().max(100).optional(),
   adresse_indicative: z.string().max(500).optional(),
-  prix_nuitee:      z.number().positive().max(10_000_000),
-  nb_chambres:      z.number().int().min(1).max(50).default(1),
-  nb_salles_bain:   z.number().int().min(1).max(20).default(1),
-  has_generator:    z.boolean().default(false),
-  has_water_pump:   z.boolean().default(false),
-  has_split_ac:     z.boolean().default(false),
-  has_wifi:         z.boolean().default(false),
-  has_parking:      z.boolean().default(false),
-  has_pool:         z.boolean().default(false),
-  latitude:         z.number().min(-90).max(90).optional(),
-  longitude:        z.number().min(-180).max(180).optional(),
-  photos:           z.array(z.string().url()).max(20).default([]),
+  prix_nuitee:        z.number().positive().max(10_000_000),
+  remise_semaine_pct: z.number().int().min(0).max(50).default(0),
+  remise_mois_pct:    z.number().int().min(0).max(70).default(0),
+  nb_chambres:        z.number().int().min(1).max(50).default(1),
+  nb_salles_bain:     z.number().int().min(1).max(20).default(1),
+  has_generator:      z.boolean().default(false),
+  has_water_pump:     z.boolean().default(false),
+  has_split_ac:       z.boolean().default(false),
+  has_wifi:           z.boolean().default(false),
+  has_parking:        z.boolean().default(false),
+  has_pool:           z.boolean().default(false),
+  latitude:           z.number().min(-90).max(90).optional(),
+  longitude:          z.number().min(-180).max(180).optional(),
+  photos:             z.array(z.string().url()).max(20).default([]),
 });
 
 export async function POST(req: NextRequest) {
@@ -102,13 +105,12 @@ export async function POST(req: NextRequest) {
     const session = await getSession(req);
     if (!session) return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     if (session.role === 'client') {
-      // Mettre à jour le rôle en propriétaire
       await db.query('UPDATE users SET role = $1 WHERE id = $2', ['proprietaire', session.userId]);
     }
 
     const body = createSchema.parse(await req.json());
 
-    const sanitizedTitle = sanitizeText(body.title);
+    const sanitizedTitle       = sanitizeText(body.title);
     const sanitizedDescription = body.description ? sanitizeText(body.description) : null;
 
     const location = body.latitude && body.longitude
@@ -118,23 +120,26 @@ export async function POST(req: NextRequest) {
     const result = await db.query(
       `INSERT INTO listings
          (owner_id, title, description, commune, quartier, adresse_indicative,
-          prix_nuitee, nb_chambres, nb_salles_bain,
+          prix_nuitee, remise_semaine_pct, remise_mois_pct,
+          nb_chambres, nb_salles_bain,
           has_generator, has_water_pump, has_split_ac, has_wifi, has_parking, has_pool,
           location, photos, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-               ${location},$16,'pending_review')
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
+               ${location},$18,'pending_review')
        RETURNING id`,
       [
-        session.userId, sanitizedTitle, sanitizedDescription, body.commune, body.quartier,
-        body.adresse_indicative, body.prix_nuitee, body.nb_chambres, body.nb_salles_bain,
+        session.userId, sanitizedTitle, sanitizedDescription,
+        body.commune, body.quartier, body.adresse_indicative,
+        body.prix_nuitee, body.remise_semaine_pct, body.remise_mois_pct,
+        body.nb_chambres, body.nb_salles_bain,
         body.has_generator, body.has_water_pump, body.has_split_ac,
-        body.has_wifi, body.has_parking, body.has_pool, body.photos,
+        body.has_wifi, body.has_parking, body.has_pool,
+        body.photos,
       ]
     );
 
     const listingId = result.rows[0].id;
 
-    // Notifier l'admin
     const { notifyAdmin } = await import('@/lib/whatsapp');
     await notifyAdmin({
       message: `Nouveau bien à valider : ${sanitizedTitle} — ${body.commune}`,
