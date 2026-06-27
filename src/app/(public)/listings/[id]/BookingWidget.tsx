@@ -30,7 +30,7 @@ function computePrice(
 // Charge le SDK PaiementPro (JS navigateur) à la demande
 function loadPaiementProSdk(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if ((window as Record<string, unknown>).PaiementPro) { resolve(); return; }
+    if ((window as unknown as Record<string, unknown>).PaiementPro) { resolve(); return; }
     const script = document.createElement('script');
     script.src = 'https://www.paiementpro.net/webservice/onlinepayment/js/paiementpro.v1.0.1.js';
     script.onload  = () => resolve();
@@ -73,7 +73,7 @@ export function BookingWidget({ listingId, prixNuitee, remiseSemainePct, remiseM
       setStep('Initialisation du paiement…');
       await loadPaiementProSdk();
 
-      const PaiementProSDK = (window as Record<string, unknown>).PaiementPro as new (merchantId: string) => {
+      const PaiementProSDK = (window as unknown as Record<string, unknown>).PaiementPro as new (merchantId: string) => {
         amount: number;
         referenceNumber: string;
         notificationURL: string;

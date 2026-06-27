@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth';
 const ADMIN_PATHS   = ['/admin', '/api/admin'];
 const PRIVATE_PATHS = ['/dashboard', '/biens/nouveau', '/reservations', '/mes-biens', '/mes-reservations', '/kyc', '/profil'];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // CORS — bloquer les requêtes cross-origin non autorisées
