@@ -27,16 +27,33 @@ function computePrice(
   return { prixEffectif, total, remisePct, remiseMontant };
 }
 
-// Charge le SDK PaiementPro (JS navigateur) à la demande
+const PAIEMENTPRO_SDK_URL =
+  'https://www.paiementpro.net/webservice/onlinepayment/js/paiementpro.v1.0.2.js';
+
+// Singleton module-level : le SDK v1.0.2 déclare PaiementPro avec `let` (non sur window).
+// Injecter le <script> deux fois provoque "Identifier already declared".
+// On mémorise la Promise dès le premier appel pour que tous les appels suivants
+// attendent le même chargement sans créer un deuxième <script>.
+let _sdkPromise: Promise<void> | null = null;
+
 function loadPaiementProSdk(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if ((window as unknown as Record<string, unknown>).PaiementPro) { resolve(); return; }
+  if (_sdkPromise) return _sdkPromise;
+  _sdkPromise = new Promise<void>((resolve, reject) => {
+    // Au cas où le <script> existe déjà dans le DOM (ex : HMR dev)
+    if (document.querySelector(`script[src="${PAIEMENTPRO_SDK_URL}"]`)) {
+      resolve();
+      return;
+    }
     const script = document.createElement('script');
-    script.src = 'https://www.paiementpro.net/webservice/onlinepayment/js/paiementpro.v1.0.2.js';
+    script.src     = PAIEMENTPRO_SDK_URL;
     script.onload  = () => resolve();
-    script.onerror = () => reject(new Error('Impossible de charger le SDK de paiement'));
+    script.onerror = () => {
+      _sdkPromise = null; // autorise un retry sur erreur réseau
+      reject(new Error('Impossible de charger le SDK de paiement'));
+    };
     document.head.appendChild(script);
   });
+  return _sdkPromise;
 }
 
 export function BookingWidget({ listingId, prixNuitee, remiseSemainePct, remiseMoisPct }: Props) {
@@ -73,22 +90,27 @@ export function BookingWidget({ listingId, prixNuitee, remiseSemainePct, remiseM
       setStep('Initialisation du paiement…');
       await loadPaiementProSdk();
 
-      const PaiementProSDK = (window as unknown as Record<string, unknown>).PaiementPro as new (merchantId: string) => {
-        amount: number;
-        referenceNumber: string;
-        notificationURL: string;
-        returnURL: string;
-        customerEmail: string;
-        customerFirstName: string;
-        customerLastname: string;
-        customerPhoneNumber: string;
-        description: string;
-        countryCurrencyCode: string;
-        getUrlPayment(): Promise<void>;
-        success: boolean;
-        url: string;
-        returnContext: string;
-      };
+      // Le SDK v1.0.2 utilise `let PaiementPro` (non attaché à window).
+      // On lit la variable via globalThis qui partage le scope lexical des scripts.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const PaiementProSDK = (globalThis as any).PaiementPro as
+        | (new (merchantId: string) => {
+            amount: number;
+            referenceNumber: string;
+            notificationURL: string;
+            returnURL: string;
+            customerEmail: string;
+            customerFirstName: string;
+            customerLastname: string;
+            customerPhoneNumber: string;
+            description: string;
+            countryCurrencyCode: string;
+            returnContext: string;
+            getUrlPayment(): Promise<void>;
+            success: boolean;
+            url: string;
+          })
+        | undefined;
 
       if (!PaiementProSDK) throw new Error('SDK de paiement indisponible');
 
