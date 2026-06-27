@@ -32,7 +32,7 @@ function loadPaiementProSdk(): Promise<void> {
   return new Promise((resolve, reject) => {
     if ((window as unknown as Record<string, unknown>).PaiementPro) { resolve(); return; }
     const script = document.createElement('script');
-    script.src = 'https://www.paiementpro.net/webservice/onlinepayment/js/paiementpro.v1.0.1.js';
+    script.src = 'https://www.paiementpro.net/webservice/onlinepayment/js/paiementpro.v1.0.2.js';
     script.onload  = () => resolve();
     script.onerror = () => reject(new Error('Impossible de charger le SDK de paiement'));
     document.head.appendChild(script);
@@ -87,6 +87,7 @@ export function BookingWidget({ listingId, prixNuitee, remiseSemainePct, remiseM
         getUrlPayment(): Promise<void>;
         success: boolean;
         url: string;
+        returnContext: string;
       };
 
       if (!PaiementProSDK) throw new Error('SDK de paiement indisponible');
@@ -103,6 +104,7 @@ export function BookingWidget({ listingId, prixNuitee, remiseSemainePct, remiseM
       pp.customerPhoneNumber = data.customerPhone;
       pp.description         = data.description;
       pp.countryCurrencyCode = '952'; // FCFA
+      pp.returnContext       = JSON.stringify({ booking_id: data.bookingId });
 
       await pp.getUrlPayment();
 
