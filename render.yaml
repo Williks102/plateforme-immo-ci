@@ -5,11 +5,15 @@ services:
     region: frankfurt
     plan: starter
     buildCommand: npm install && npm run build
-    startCommand: npm run start
+    # -H 0.0.0.0 : bind sur toutes les interfaces (IPv4 + IPv6) — requis pour Render
+    # $PORT      : Render injecte le port automatiquement
+    startCommand: npx next start -H 0.0.0.0 -p $PORT
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: HOSTNAME
+        value: "0.0.0.0"
       # DATABASE_URL : coller l'URL externe depuis Render > PostgreSQL > External URL
       - key: DATABASE_URL
         sync: false

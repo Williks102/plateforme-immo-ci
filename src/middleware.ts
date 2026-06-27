@@ -2,18 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 
 const ADMIN_PATHS   = ['/admin', '/api/admin'];
-const PRIVATE_PATHS = ['/dashboard', '/biens/nouveau', '/reservations']; // /reservations couvre liste + [id]/confirmation
+const PRIVATE_PATHS = ['/dashboard', '/biens/nouveau', '/reservations', '/mes-biens', '/mes-reservations', '/kyc', '/profil'];
 
-export async function proxy(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // CORS — bloquer les requêtes cross-origin non autorisées
-  // Note: req.nextUrl.host est l'adresse interne sur Render — on utilise le header Host
   if (pathname.startsWith('/api/')) {
     const origin = req.headers.get('origin');
     if (origin) {
-      const publicHost = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host;
-      const isSameOrigin = new URL(origin).host === publicHost;
+      const publicHost  = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? req.nextUrl.host;
+      const isSameOrigin  = new URL(origin).host === publicHost;
       const isPaiementPro = pathname.startsWith('/api/webhooks/') &&
         origin === (process.env.PAYMENT_PRO_CALLBACK_ORIGIN ?? 'https://paiementpro.net');
       if (!isSameOrigin && !isPaiementPro) {
