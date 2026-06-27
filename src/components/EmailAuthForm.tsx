@@ -7,6 +7,7 @@ type Role = 'client' | 'proprietaire';
 
 interface Props {
   redirectTo?: string;
+  defaultTab?: Tab;
 }
 
 const ROLE_HOME: Record<string, string> = {
@@ -15,9 +16,9 @@ const ROLE_HOME: Record<string, string> = {
   client:       '/reservations',
 };
 
-export function EmailAuthForm({ redirectTo }: Props) {
+export function EmailAuthForm({ redirectTo, defaultTab = 'login' }: Props) {
   const router = useRouter();
-  const [tab, setTab]           = useState<Tab>('login');
+  const [tab, setTab]           = useState<Tab>(defaultTab);
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole]         = useState<Role>('client');
@@ -41,7 +42,6 @@ export function EmailAuthForm({ redirectTo }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      // Priorité : 1) redirect explicite de l'URL  2) page d'accueil du rôle
       const destination = redirectTo ?? ROLE_HOME[data.role] ?? '/';
       router.push(destination);
       router.refresh();
@@ -71,11 +71,8 @@ export function EmailAuthForm({ redirectTo }: Props) {
         ))}
       </div>
 
-      {/* Email */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Adresse email
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Adresse email</label>
         <input
           type="email"
           value={email}
@@ -86,11 +83,8 @@ export function EmailAuthForm({ redirectTo }: Props) {
         />
       </div>
 
-      {/* Mot de passe */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Mot de passe
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
         <input
           type="password"
           value={password}
@@ -101,12 +95,9 @@ export function EmailAuthForm({ redirectTo }: Props) {
         />
       </div>
 
-      {/* Rôle (inscription seulement) */}
       {tab === 'register' && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Je suis
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Je suis</label>
           <div className="flex gap-3">
             {(['client', 'proprietaire'] as Role[]).map(r => (
               <button
@@ -126,9 +117,7 @@ export function EmailAuthForm({ redirectTo }: Props) {
         </div>
       )}
 
-      {error && (
-        <p className="text-red-600 text-sm text-center">{error}</p>
-      )}
+      {error && <p className="text-red-600 text-sm text-center">{error}</p>}
 
       <button
         onClick={submit}
@@ -137,6 +126,15 @@ export function EmailAuthForm({ redirectTo }: Props) {
       >
         {loading ? '...' : tab === 'login' ? 'Se connecter' : 'Créer mon compte'}
       </button>
+
+      {tab === 'login' && (
+        <p className="text-center text-sm text-gray-500">
+          Pas encore de compte ?{' '}
+          <button onClick={() => setTab('register')} className="text-orange-600 font-medium hover:underline">
+            S'inscrire
+          </button>
+        </p>
+      )}
     </div>
   );
 }

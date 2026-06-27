@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { db } from '@/lib/db';
 import { ListingCard } from '@/components/ListingCard';
+import Navbar from '@/components/Navbar';
 
 export const revalidate = 60;
 
@@ -24,19 +25,7 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-orange-600">ImmoCI</Link>
-          <div className="flex gap-2">
-            <Link href="/connexion" className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-orange-600">
-              Connexion
-            </Link>
-            <Link href="/biens/nouveau" className="px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg">
-              Publier un bien
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       <section className="bg-gradient-to-br from-orange-500 to-orange-700 text-white py-16 px-4">
         <div className="max-w-2xl mx-auto text-center">
@@ -48,7 +37,7 @@ export default async function Home() {
           </p>
           <Link
             href="/recherche"
-            className="inline-block bg-white text-orange-600 font-semibold px-8 py-3 rounded-xl"
+            className="inline-block bg-white text-orange-600 font-semibold px-8 py-3 rounded-xl hover:bg-orange-50 transition-colors"
           >
             Rechercher un bien
           </Link>
@@ -81,7 +70,7 @@ export default async function Home() {
           </p>
           <Link
             href="/biens/nouveau"
-            className="inline-block bg-orange-600 text-white font-semibold px-6 py-3 rounded-xl"
+            className="inline-block bg-orange-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-orange-700 transition-colors"
           >
             Publier mon bien
           </Link>
