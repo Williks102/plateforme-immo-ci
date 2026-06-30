@@ -4,6 +4,29 @@ import { DateRange } from 'react-day-picker';
 import { differenceInDays, format } from 'date-fns';
 import { AvailabilityCalendar } from '@/components/AvailabilityCalendar';
 
+type PaiementProConstructor = new (merchantId: string) => {
+  amount: number;
+  referenceNumber: string;
+  notificationURL: string;
+  returnURL: string;
+  customerEmail: string;
+  customerFirstName: string;
+  customerLastname: string;
+  customerPhoneNumber: string;
+  description: string;
+  countryCurrencyCode: string;
+  returnContext: string;
+  getUrlPayment(): Promise<void>;
+  success: boolean;
+  url: string;
+};
+
+type PaiementProGlobal = Window & { PaiementPro?: PaiementProConstructor };
+
+function getPaiementProGlobal() {
+  return (window as PaiementProGlobal).PaiementPro;
+}
+
 interface Props {
   listingId: string;
   prixNuitee: number;
@@ -27,24 +50,57 @@ function computePrice(
   return { prixEffectif, total, remisePct, remiseMontant };
 }
 
-// SDK servi via notre propre proxy (/api/paiementpro-sdk) qui enveloppe le code
-// du SDK dans une IIFE et assigne window.PaiementPro explicitement.
-// Avantages : origin 'self' (CSP), pas de bridge inline, pas d'unsafe-eval.
-const PAIEMENTPRO_SDK_URL = '/api/paiementpro-sdk';
+// SDK officiel PaiementPro chargé directement depuis leur domaine.
+// Le proxy serveur /api/paiementpro-sdk peut être bloqué par PaiementPro (403 côté serveur),
+// ce qui empêchait l'initialisation avant même l'appel à getUrlPayment().
+const PAIEMENTPRO_SDK_URL = 'https://www.paiementpro.net/webservice/onlinepayment/js/paiementpro.v1.0.2.js';
 
 // Singleton module-level — un seul <script> quel que soit le nombre d'appels.
 let _sdkPromise: Promise<void> | null = null;
 
+function exposePaiementProGlobal() {
+  if (getPaiementProGlobal()) return;
+
+  // Le SDK documenté déclare `PaiementPro` au top-level d'un script classique.
+  // Cette déclaration n'est pas lisible depuis le bundle Next.js (module), donc on
+  // ajoute un petit pont classique qui l'expose explicitement sur window.
+  const bridge = document.createElement('script');
+  bridge.text = 'if(typeof PaiementPro!==\"undefined\"&&!window.PaiementPro)window.PaiementPro=PaiementPro;';
+  document.head.appendChild(bridge);
+}
+
 function loadPaiementProSdk(): Promise<void> {
+  if (getPaiementProGlobal()) return Promise.resolve();
   if (_sdkPromise) return _sdkPromise;
+
   _sdkPromise = new Promise<void>((resolve, reject) => {
-    if (document.querySelector(`script[src="${PAIEMENTPRO_SDK_URL}"]`)) {
-      resolve();
+    const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${PAIEMENTPRO_SDK_URL}"]`);
+
+    const onReady = () => {
+      exposePaiementProGlobal();
+      if (getPaiementProGlobal()) {
+        resolve();
+      } else {
+        _sdkPromise = null;
+        reject(new Error('SDK de paiement chargé mais indisponible'));
+      }
+    };
+
+    if (existingScript) {
+      existingScript.addEventListener('load', onReady, { once: true });
+      existingScript.addEventListener('error', () => {
+        _sdkPromise = null;
+        reject(new Error('Impossible de charger le SDK de paiement'));
+      }, { once: true });
+      // Si le script était déjà chargé avant cet appel, le pont suffit.
+      setTimeout(onReady, 0);
       return;
     }
+
     const script = document.createElement('script');
     script.src     = PAIEMENTPRO_SDK_URL;
-    script.onload  = () => resolve();
+    script.async   = true;
+    script.onload  = onReady;
     script.onerror = () => {
       _sdkPromise = null;
       reject(new Error('Impossible de charger le SDK de paiement'));
@@ -88,26 +144,7 @@ export function BookingWidget({ listingId, prixNuitee, remiseSemainePct, remiseM
       setStep('Initialisation du paiement…');
       await loadPaiementProSdk();
 
-      // Le proxy /api/paiementpro-sdk enveloppe le SDK et assigne window.PaiementPro.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const PaiementProSDK = (window as any).PaiementPro as
-        | (new (merchantId: string) => {
-            amount: number;
-            referenceNumber: string;
-            notificationURL: string;
-            returnURL: string;
-            customerEmail: string;
-            customerFirstName: string;
-            customerLastname: string;
-            customerPhoneNumber: string;
-            description: string;
-            countryCurrencyCode: string;
-            returnContext: string;
-            getUrlPayment(): Promise<void>;
-            success: boolean;
-            url: string;
-          })
-        | undefined;
+      const PaiementProSDK = getPaiementProGlobal();
 
       if (!PaiementProSDK) throw new Error('SDK de paiement indisponible');
 
